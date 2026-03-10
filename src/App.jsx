@@ -336,23 +336,14 @@ export default function Prof() {
 
   async function api(messages, t, sysOverride) {
     const ctx = t ? `\n\nCurrent topic: "${t.title}" — ${t.sub}\nDepth: ${t.depth}` : "";
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
+    const system = (sysOverride || SYSTEM_PROMPT) + ctx;
+    const r = await fetch("/api/chat", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1000,
-        system: (sysOverride || SYSTEM_PROMPT) + ctx,
-        messages,
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages, system }),
     });
     const d = await r.json();
-    return d.content?.find(b => b.type === "text")?.text || "Error.";
+    return d.text || "Error.";
   }
 
   async function startTopic(t, domain) {
