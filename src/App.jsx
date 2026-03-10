@@ -146,83 +146,79 @@ const CURRICULUM = [
   },
 ];
 
-const SYSTEM_PROMPT = `You are an elite AI/ML professor — a synthesis of Andrej Karpathy's hands-on clarity, Yann LeCun's theoretical depth, and Richard Feynman's infectious joy.
+// ─── PROMPTS ──────────────────────────────────────────────────────────────────
 
-Your mission: genuine understanding. Not summaries. Real depth that makes the student feel the click.
+const FREE_SESSION_PROMPT = `You are an elite AI/ML professor — a synthesis of Andrej Karpathy's hands-on clarity, Yann LeCun's theoretical depth, and Richard Feynman's infectious joy.
 
-TEACHING STRUCTURE:
-1. INTUITION — What problem does this solve? What would a smart person invent from scratch?
-2. MATHEMATICS — Show actual derivations. Explain every symbol. Do not skip steps.
-3. GEOMETRIC INTUITION — What does this look like in space?
-4. CONNECTION — How does this link to information theory, probability, optimization?
-5. PYTHON CODE — Real, runnable, well-commented. Start from numpy when educational.
-6. THE AHA — Build toward the insight. Make them feel the click.
-7. EXERCISES — Always end every lesson with 3 coding exercises (see format below).
+The student is in a FREE SESSION — open conversation about any AI/ML topic.
+You know their full curriculum: Mathematical Foundations, Classical ML, Neural Networks, Latent Spaces, Transformers, Advanced Frontiers, Python Implementation, C++ Systems, MLOps.
 
-EXERCISE FORMAT — always end lessons with this exact section:
+Be passionate, precise, go as deep as the student wants. Connect questions to the broader curriculum when natural.
+
+FORMATTING — KaTeX active:
+- Inline math: $expression$ — Display math: $$expression$$
+- Code: triple backtick + language — Bold: **term** — Insight: > text`;
+
+const MAP_PROMPT = `You are an elite AI/ML professor generating a structured lesson plan.
+
+For the topic "{TITLE}" ({SUB}), produce a complete lesson map listing every concept that must be mastered.
+The number of sections should reflect the genuine depth of the topic — do not cap or pad artificially.
+
+Respond ONLY in this exact JSON format, no extra text:
+{
+  "sections": [
+    { "id": 1, "title": "Section title", "summary": "One sentence on what this covers" },
+    { "id": 2, "title": "Section title", "summary": "One sentence on what this covers" }
+  ]
+}`;
+
+const SECTION_PROMPT = `You are an elite AI/ML professor teaching section {INDEX} of {TOTAL} in a structured lesson on "{TOPIC}".
+
+This section: "{SECTION_TITLE}" — {SECTION_SUMMARY}
+
+Teach ONLY this section. Stay scoped. Go deep — show the math, intuition, geometry, and code when relevant.
+End with ONE short check question labeled exactly: **Check:** [your question]
+
+FORMATTING — KaTeX active:
+- Inline math: $expression$ — Display math (own line): $$expression$$
+- Multi-step derivations: multiple $$ blocks, one per step — never \\begin{align}
+- Code: triple backtick + language — Bold: **term** — Header: ### Title — Insight: > text
+- Be passionate. Say when math is beautiful.`;
+
+const EXERCISE_PROMPT = `You are an elite AI/ML professor. The student just completed a full lesson on "{TOPIC}".
+
+Generate adaptive exercises suited to this topic's nature:
+- For foundational/mathematical topics (set theory, probability, linear algebra): use proof exercises, logical reasoning, worked examples — NOT just coding
+- For implementation topics (backprop, optimizers, transformers): use coding exercises
+- Mix as appropriate for hybrid topics
+
+Format exactly:
 ### Exercises
 
-**Exercise 1 — Foundation** *(~15 min)*
-[A concrete coding task that implements the core concept from scratch in numpy/Python. Include a starter code skeleton and specify exactly what to implement. Describe a common error they will likely encounter and what it means.]
+**Exercise 1 — Foundation**
+Goal, task description, success criteria, one Hint.
 
-**Exercise 2 — Apply & Break** *(~25 min)*
-[A task that uses PyTorch/real libraries to build something practical. Include intentionally tricky edge cases or a bug to find. They should run it, see it fail, understand why, and fix it.]
+**Exercise 2 — Apply**
+Goal, task description, success criteria, one Hint.
 
-**Exercise 3 — Challenge** *(~45 min)*
-[A harder project-level task that connects this topic to adjacent concepts. Open-ended enough to explore, specific enough to complete. Should produce a result they can visualize or measure.]
+**Exercise 3 — Challenge**
+Goal, task description, success criteria, one Hint.`;
 
-For each exercise include:
-- Clear goal statement
-- Starter code scaffold (they fill in the blanks)
-- What success looks like (expected output/behavior)
-- One hint hidden behind "Hint:" prefix they can choose to read
-
-CRITICAL FORMATTING — a KaTeX renderer will parse these:
-- Inline math: $expression$ e.g. $\\sigma(x) = \\frac{1}{1+e^{-x}}$ or $\\theta$
-- Display math (own line, blank line before and after): $$expression$$
-- For multi-step derivations use MULTIPLE $$ blocks, one per step — do NOT use \\begin{align}
-- Code: triple backtick with language name (python, cpp, bash)
-- Key insight: > text
-- Bold term: **term**
-- Section header: ### Title
-
-TONE: Be passionate. Say when math is beautiful. Lean into counterintuitive surprises. This student wants mastery — the rush of everything making sense. Give them that.`;
-
-const EXERCISE_PROMPT = `Generate 3 standalone coding exercises for the topic: "{TOPIC}".
-
-These are practice exercises — no lesson content, just exercises.
-
-Format exactly as:
-### Exercises
-
-**Exercise 1 — Foundation** *(~15 min)*
-[numpy/pure Python implementation from scratch]
-
-**Exercise 2 — Apply & Break** *(~25 min)*  
-[PyTorch task with an intentional bug or tricky edge case to diagnose]
-
-**Exercise 3 — Challenge** *(~45 min)*
-[Project-level task connecting to adjacent concepts]
-
-For each: clear goal, starter code scaffold, expected output, one Hint.
-Make exercises that teach through doing — errors are features, not bugs.`;
+// ─── KATEX ────────────────────────────────────────────────────────────────────
 
 function useKaTeX() {
   const [ready, setReady] = useState(!!window.katex);
   useEffect(() => {
     if (window.katex) { setReady(true); return; }
     if (!document.getElementById("ktx-css")) {
-      const l = document.createElement("link");
-      l.id = "ktx-css"; l.rel = "stylesheet";
-      l.href = "https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css";
+      const l = document.createElement("link"); l.id="ktx-css"; l.rel="stylesheet";
+      l.href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css";
       document.head.appendChild(l);
     }
     if (document.getElementById("ktx-js")) return;
-    const s = document.createElement("script");
-    s.id = "ktx-js";
-    s.src = "https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js";
-    s.onload = () => setReady(true);
-    s.onerror = () => console.warn("KaTeX CDN failed");
+    const s = document.createElement("script"); s.id="ktx-js";
+    s.src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js";
+    s.onload=()=>setReady(true); s.onerror=()=>console.warn("KaTeX failed");
     document.head.appendChild(s);
   }, []);
   return ready;
@@ -231,173 +227,137 @@ function useKaTeX() {
 function esc(s) { return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
 function tex(math, display, ready) {
-  if (!ready || !window.katex) {
-    const inner = esc(math.trim());
-    return display
-      ? `<span class="math-fb-d">${inner}</span>`
-      : `<span class="math-fb-i">${inner}</span>`;
+  if (!ready||!window.katex) {
+    const inner=esc(math.trim());
+    return display?`<span class="math-fb-d">${inner}</span>`:`<span class="math-fb-i">${inner}</span>`;
   }
-  try {
-    return window.katex.renderToString(math.trim(), {
-      displayMode: display, throwOnError: false, strict: false,
-      trust: true, macros: { "\\R": "\\mathbb{R}", "\\N": "\\mathbb{N}" },
-    });
-  } catch(e) {
-    return `<span class="math-fb-i">${esc(math)}</span>`;
-  }
+  try { return window.katex.renderToString(math.trim(),{displayMode:display,throwOnError:false,strict:false,trust:true,macros:{"\\R":"\\mathbb{R}","\\N":"\\mathbb{N}"}}); }
+  catch(e) { return `<span class="math-fb-i">${esc(math)}</span>`; }
 }
 
 function buildHtml(raw, ready) {
-  const slots = [];
-  const slot = (html) => { const k = `\x00${slots.length}\x00`; slots.push(html); return k; };
-
-  let t = raw.replace(/```([\w+-]*)\r?\n([\s\S]*?)```/g, (_, lang, code) =>
-    slot(`<div class="cb"><div class="cbl">${esc(lang||"code")}</div><pre><code>${esc(code.trimEnd())}</code></pre></div>`)
-  );
-
-  t = t.replace(/\$\$\s*([\s\S]+?)\s*\$\$/g, (_, m) =>
-    slot(`<div class="dmath">${tex(m, true, ready)}</div>`)
-  );
-
-  t = t.replace(/\$([^$\r\n]+?)\$/g, (_, m) =>
-    slot(`<span class="imath">${tex(m, false, ready)}</span>`)
-  );
-
-  t = t
-    .replace(/^#### (.+)$/gm, "<h4>$1</h4>")
-    .replace(/^### (.+)$/gm,  "<h3>$1</h3>")
-    .replace(/^## (.+)$/gm,   "<h2>$1</h2>")
-    .replace(/^> (.+)$/gm,    "<blockquote>$1</blockquote>")
-    .replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>")
-    .replace(/`([^`\r\n]+)`/g,`<code class="ic">$1</code>`)
-    .replace(/\n\n+/g, "</p><p>")
-    .replace(/\n/g, "<br/>");
-
-  t = `<p>${t}</p>`;
-
-  slots.forEach((v, i) => { t = t.split(`\x00${i}\x00`).join(v); });
+  const slots=[]; const slot=(html)=>{const k=`\x00${slots.length}\x00`;slots.push(html);return k;};
+  let t=raw.replace(/```([\w+-]*)\r?\n([\s\S]*?)```/g,(_,lang,code)=>slot(`<div class="cb"><div class="cbl">${esc(lang||"code")}</div><pre><code>${esc(code.trimEnd())}</code></pre></div>`));
+  t=t.replace(/\$\$\s*([\s\S]+?)\s*\$\$/g,(_,m)=>slot(`<div class="dmath">${tex(m,true,ready)}</div>`));
+  t=t.replace(/\$([^$\r\n]+?)\$/g,(_,m)=>slot(`<span class="imath">${tex(m,false,ready)}</span>`));
+  t=t.replace(/^#### (.+)$/gm,"<h4>$1</h4>").replace(/^### (.+)$/gm,"<h3>$1</h3>").replace(/^## (.+)$/gm,"<h2>$1</h2>")
+    .replace(/^> (.+)$/gm,"<blockquote>$1</blockquote>").replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>")
+    .replace(/`([^`\r\n]+)`/g,`<code class="ic">$1</code>`).replace(/\n\n+/g,"</p><p>").replace(/\n/g,"<br/>");
+  t=`<p>${t}</p>`;
+  slots.forEach((v,i)=>{t=t.split(`\x00${i}\x00`).join(v);});
   return t;
 }
 
-function MsgRenderer({ content, ready, accent }) {
-  const html = useMemo(() => buildHtml(content, ready), [content, ready]);
-  return (
-    <div className="msgbody" style={{ "--ac": accent }}
-      dangerouslySetInnerHTML={{ __html: html }} />
-  );
+function MsgRenderer({content,ready,accent}) {
+  const html=useMemo(()=>buildHtml(content,ready),[content,ready]);
+  return <div className="msgbody" style={{"--ac":accent}} dangerouslySetInnerHTML={{__html:html}}/>;
 }
 
-function Dots({ color }) {
-  return (
-    <span style={{ display:"flex", gap:6, padding:"10px 0" }}>
-      {[0,1,2].map(i => (
-        <span key={i} style={{ width:7,height:7,borderRadius:"50%",background:color,
-          display:"inline-block",animation:`dp 1.3s ease ${i*.22}s infinite` }}/>
-      ))}
-    </span>
-  );
+function Dots({color}) {
+  return <span style={{display:"flex",gap:6,padding:"10px 0"}}>{[0,1,2].map(i=><span key={i} style={{width:7,height:7,borderRadius:"50%",background:color,display:"inline-block",animation:`dp 1.3s ease ${i*.22}s infinite`}}/>)}</span>;
 }
+
+// ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 export default function Prof() {
-  const [view, setView]         = useState("home");
-  const [topic, setTopic]       = useState(null);
-  const [msgs, setMsgs]         = useState([]);
-  const [input, setInput]       = useState("");
-  const [busy, setBusy]         = useState(false);
-  const [expanded, setExpanded] = useState(null);
-  const [exerciseMode, setExerciseMode] = useState(false);
-  const endRef                  = useRef(null);
-  const taRef                   = useRef(null);
-  const ready                   = useKaTeX();
+  const [view, setView]               = useState("home");
+  const [topic, setTopic]             = useState(null);
+  const [lessonMap, setLessonMap]     = useState(null);
+  const [sectionIdx, setSectionIdx]   = useState(0);
+  const [sectionMsgs, setSectionMsgs] = useState([]);
+  const [freeMsgs, setFreeMsgs]       = useState([]);
+  const [input, setInput]             = useState("");
+  const [busy, setBusy]               = useState(false);
+  const [expanded, setExpanded]       = useState(null);
+  const [lessonPhase, setLessonPhase] = useState("map"); // "map"|"learning"|"exercises"
+  const [exerciseContent, setExerciseContent] = useState(null);
+  const endRef = useRef(null);
+  const taRef  = useRef(null);
+  const ready  = useKaTeX();
 
-  // ── PERSISTENT PROGRESS ──────────────────────────────────────────────────
   const [progress, setProgress] = useState(() => {
-    try {
-      const saved = localStorage.getItem("professor-progress");
-      return saved ? JSON.parse(saved) : {};
-    } catch { return {}; }
+    try { const s=localStorage.getItem("professor-progress"); return s?JSON.parse(s):{} } catch { return {}; }
   });
+  useEffect(()=>{ localStorage.setItem("professor-progress",JSON.stringify(progress)); },[progress]);
+  useEffect(()=>{ endRef.current?.scrollIntoView({behavior:"smooth"}); },[sectionMsgs,freeMsgs,busy,lessonMap,lessonPhase,exerciseContent]);
 
-  // Save progress to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem("professor-progress", JSON.stringify(progress));
-  }, [progress]);
-
-  // ── LAST VISITED TOPIC (so the counter shows your latest session) ─────────
-  useEffect(() => {
-    try {
-      const lastTopic = localStorage.getItem("professor-last-topic");
-      if (lastTopic) setTopic(JSON.parse(lastTopic));
-    } catch {}
-  }, []);
-  // ─────────────────────────────────────────────────────────────────────────
-
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs, busy]);
-
-  async function api(messages, t, sysOverride) {
-    const ctx = t ? `\n\nCurrent topic: "${t.title}" — ${t.sub}\nDepth: ${t.depth}` : "";
-    const system = (sysOverride || SYSTEM_PROMPT) + ctx;
-    const r = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages, system }),
-    });
+  async function api(messages, system) {
+    const r = await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages,system})});
     const d = await r.json();
     return d.text || "Error.";
   }
 
-  async function startTopic(t, domain) {
-    const full = { ...t, domainColor: domain.color, domainName: domain.domain };
-    setTopic(full);
-    localStorage.setItem("professor-last-topic", JSON.stringify(full));
-    setMsgs([]); setView("chat"); setBusy(true); setExerciseMode(false);
-    const opener = { role:"user", content:`Teach me **${t.title}** with full depth. Start from pure intuition, build to the complete mathematics, show the geometry, finish with Python code and exercises. I want the aha moment.` };
-    const reply = await api([opener], full);
-    setMsgs([opener, { role:"assistant", content:reply }]);
-    setBusy(false);
-    setProgress(p => ({ ...p, [t.id]: Math.max(p[t.id]||0, 1) }));
-  }
-
-  async function getExercises() {
-    if (!topic || busy) return;
-    setBusy(true); setExerciseMode(true);
-    const sys = EXERCISE_PROMPT.replace("{TOPIC}", topic.title);
-    const req = { role:"user", content:`Give me 3 coding exercises for: ${topic.title}` };
-    const reply = await api([req], topic, sys);
-    setMsgs(m => [...m, req, { role:"assistant", content: reply }]);
+  // FREE SESSION
+  async function sendFree(text) {
+    if(!text?.trim()||busy) return;
+    const newMsgs=[...freeMsgs,{role:"user",content:text}];
+    setFreeMsgs(newMsgs); setInput(""); setBusy(true);
+    if(taRef.current) taRef.current.style.height="52px";
+    const reply=await api(newMsgs,FREE_SESSION_PROMPT);
+    setFreeMsgs([...newMsgs,{role:"assistant",content:reply}]);
     setBusy(false);
   }
 
-  async function send(text, base) {
-    if (!text?.trim() || busy) return;
-    const newMsgs = [...(base ?? msgs), { role:"user", content: text }];
-    setMsgs(newMsgs); setInput(""); setBusy(true);
-    if (taRef.current) taRef.current.style.height = "52px";
-    const reply = await api(newMsgs, topic);
-    setMsgs([...newMsgs, { role:"assistant", content: reply }]);
+  // START LESSON — generate map
+  async function startLesson(t, domain) {
+    const full={...t,domainColor:domain.color,domainName:domain.domain};
+    setTopic(full); setView("lesson"); setLessonPhase("map");
+    setLessonMap(null); setSectionIdx(0); setSectionMsgs([]); setExerciseContent(null); setBusy(true);
+    const sys=MAP_PROMPT.replace("{TITLE}",t.title).replace("{SUB}",t.sub);
+    const raw=await api([{role:"user",content:`Generate lesson map for: ${t.title}`}],sys);
+    try {
+      const clean=raw.replace(/```json|```/g,"").trim();
+      setLessonMap(JSON.parse(clean).sections);
+    } catch { setLessonMap([{id:1,title:t.title,summary:t.depth}]); }
     setBusy(false);
-    if (topic) setProgress(p => ({ ...p, [topic.id]: Math.max(p[topic.id]||0, newMsgs.filter(m=>m.role==="user").length) }));
   }
 
-  function resetProgress() {
-    setProgress({});
-    localStorage.removeItem("professor-progress");
-    localStorage.removeItem("professor-last-topic");
+  // TEACH A SECTION
+  async function teachSection(idx, map) {
+    const sec=map[idx];
+    setSectionIdx(idx); setSectionMsgs([]); setLessonPhase("learning"); setBusy(true);
+    const sys=SECTION_PROMPT.replace("{INDEX}",idx+1).replace("{TOTAL}",map.length)
+      .replace("{TOPIC}",topic.title).replace("{SECTION_TITLE}",sec.title).replace("{SECTION_SUMMARY}",sec.summary);
+    const reply=await api([{role:"user",content:`Teach: ${sec.title}`}],sys);
+    setSectionMsgs([{role:"assistant",content:reply}]);
+    setBusy(false);
+    setProgress(p=>({...p,[topic.id]:Math.max(p[topic.id]||0,idx+1)}));
   }
 
-  const total = CURRICULUM.reduce((a,d) => a + d.topics.length, 0);
-  const done  = Object.keys(progress).length;
-  const ac    = topic?.domainColor || "#D4A96A";
+  // QUESTION INSIDE LESSON
+  async function sendInLesson(text) {
+    if(!text?.trim()||busy) return;
+    const sec=lessonMap[sectionIdx];
+    const sys=SECTION_PROMPT.replace("{INDEX}",sectionIdx+1).replace("{TOTAL}",lessonMap.length)
+      .replace("{TOPIC}",topic.title).replace("{SECTION_TITLE}",sec.title).replace("{SECTION_SUMMARY}",sec.summary)
+      +`\n\nThe student is asking a question about this section. Answer clearly and concisely, then gently return to the lesson flow.`;
+    const newMsgs=[...sectionMsgs,{role:"user",content:text}];
+    setSectionMsgs(newMsgs); setInput(""); setBusy(true);
+    if(taRef.current) taRef.current.style.height="46px";
+    const reply=await api(newMsgs,sys);
+    setSectionMsgs([...newMsgs,{role:"assistant",content:reply}]);
+    setBusy(false);
+  }
 
-  const QUICK = [
-    "Derive the math from scratch", "Show me Python code", "Geometric intuition",
-    "Connect to information theory", "Go deeper on the math", "Why does this actually work?",
-    "C++ implementation perspective", "Give me a concrete numerical example",
-    "What breaks if we change this?",
-  ];
+  // GENERATE EXERCISES
+  async function generateExercises() {
+    setBusy(true); setLessonPhase("exercises");
+    const sys=EXERCISE_PROMPT.replace("{TOPIC}",topic.title);
+    const reply=await api([{role:"user",content:`Generate exercises for: ${topic.title}`}],sys);
+    setExerciseContent(reply); setBusy(false);
+    setProgress(p=>({...p,[topic.id]:999}));
+  }
+
+  function resetProgress() { setProgress({}); localStorage.removeItem("professor-progress"); }
+  function goHome() { setView("home");setTopic(null);setLessonMap(null);setSectionMsgs([]);setFreeMsgs([]);setLessonPhase("map");setExerciseContent(null); }
+
+  const total=CURRICULUM.reduce((a,d)=>a+d.topics.length,0);
+  const done=Object.keys(progress).length;
+  const ac=topic?.domainColor||"#D4A96A";
+  const isLast=lessonMap&&sectionIdx===lessonMap.length-1;
 
   return (
-    <div style={{ width:"100%", minHeight:"100vh", background:"#080808", color:"#E2D9CE", fontFamily:"Palatino Linotype,Palatino,serif", display:"flex", flexDirection:"column" }}>
+    <div style={{width:"100%",minHeight:"100vh",background:"#080808",color:"#E2D9CE",fontFamily:"Palatino Linotype,Palatino,serif",display:"flex",flexDirection:"column"}}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap');
         *{box-sizing:border-box}
@@ -423,104 +383,76 @@ export default function Prof() {
         .math-fb-i{font-family:'JetBrains Mono',monospace;font-size:.88em;color:#A8C8A0;opacity:.85}
         .trow{transition:background .15s;border-radius:4px}.trow:hover{background:rgba(255,255,255,.04)!important;cursor:pointer}
         .dhdr:hover{opacity:.78;cursor:pointer}
-        .qbtn:hover{background:rgba(255,255,255,.07)!important;border-color:#3A3A3A!important;color:#C0B8B0!important}
         .sndbtn:hover:not(:disabled){filter:brightness(1.15)}
         .bbtn:hover{color:#D4A96A!important}
         .resetbtn:hover{color:#C97B7B!important;border-color:#C97B7B44!important}
+        .navbtn:hover{opacity:.75!important}
+        .nextbtn:hover{filter:brightness(1.12)}
       `}</style>
 
       {/* HEADER */}
-      <header style={{ borderBottom:"1px solid #131313",padding:"17px 32px",display:"flex",alignItems:"center",justifyContent:"space-between",background:"#080808",position:"sticky",top:0,zIndex:200 }}>
-        <div style={{ display:"flex",alignItems:"center",gap:14 }}>
-          {view==="chat" && (
-            <button className="bbtn" onClick={()=>{setView("home");setTopic(null);setMsgs([]);}}
-              style={{ background:"none",border:"none",color:"#555",fontSize:22,padding:"0 10px 0 0",fontFamily:"serif",cursor:"pointer",transition:"color .2s" }}>←</button>
-          )}
+      <header style={{borderBottom:"1px solid #131313",padding:"17px 32px",display:"flex",alignItems:"center",justifyContent:"space-between",background:"#080808",position:"sticky",top:0,zIndex:200}}>
+        <div style={{display:"flex",alignItems:"center",gap:14}}>
+          {view!=="home" && <button className="bbtn" onClick={goHome} style={{background:"none",border:"none",color:"#555",fontSize:22,padding:"0 10px 0 0",fontFamily:"serif",cursor:"pointer",transition:"color .2s"}}>←</button>}
           <div>
-            <div style={{ fontSize:9,letterSpacing:4.5,color:"#353535",fontFamily:"'JetBrains Mono',monospace",textTransform:"uppercase" }}>PROFESSOR · AI</div>
-            <div style={{ fontSize:17,fontWeight:700,color:"#E2D9CE",letterSpacing:.4 }}>
-              {view==="chat"&&topic ? topic.title : "Machine Intelligence"}
+            <div style={{fontSize:9,letterSpacing:4.5,color:"#353535",fontFamily:"'JetBrains Mono',monospace",textTransform:"uppercase"}}>PROFESSOR · AI</div>
+            <div style={{fontSize:17,fontWeight:700,color:"#E2D9CE",letterSpacing:.4}}>
+              {view==="home"?"Machine Intelligence":view==="free"?"Free Session":topic?.title}
             </div>
           </div>
         </div>
-
         {view==="home" ? (
-          <div style={{ display:"flex", alignItems:"center", gap:16 }}>
-            {/* Progress bar */}
-            <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:5 }}>
-              <div style={{ fontSize:11,color:"#383838",fontFamily:"'JetBrains Mono',monospace" }}>
-                <span style={{ color:"#D4A96A" }}>{done}</span>/{total} explored
-              </div>
-              <div style={{ width:120, height:3, background:"#1A1A1A", borderRadius:2, overflow:"hidden" }}>
-                <div style={{ width:`${(done/total)*100}%`, height:"100%", background:"#D4A96A", borderRadius:2, transition:"width .4s ease" }}/>
+          <div style={{display:"flex",alignItems:"center",gap:16}}>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:5}}>
+              <div style={{fontSize:11,color:"#383838",fontFamily:"'JetBrains Mono',monospace"}}><span style={{color:"#D4A96A"}}>{done}</span>/{total} explored</div>
+              <div style={{width:120,height:3,background:"#1A1A1A",borderRadius:2,overflow:"hidden"}}>
+                <div style={{width:`${(done/total)*100}%`,height:"100%",background:"#D4A96A",borderRadius:2,transition:"width .4s ease"}}/>
               </div>
             </div>
-            {/* Reset button */}
-            {done > 0 && (
-              <button className="resetbtn" onClick={resetProgress}
-                style={{ background:"none", border:"1px solid #2A2A2A", color:"#3A3A3A", borderRadius:6,
-                  padding:"5px 10px", fontSize:9, fontFamily:"'JetBrains Mono',monospace",
-                  cursor:"pointer", letterSpacing:1.5, transition:"all .2s" }}>
-                RESET
-              </button>
-            )}
+            {done>0 && <button className="resetbtn" onClick={resetProgress} style={{background:"none",border:"1px solid #2A2A2A",color:"#3A3A3A",borderRadius:6,padding:"5px 10px",fontSize:9,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",letterSpacing:1.5,transition:"all .2s"}}>RESET</button>}
           </div>
-        ) : (
-          topic && <div style={{ fontSize:9,color:ac,letterSpacing:2.5,fontFamily:"'JetBrains Mono',monospace",textTransform:"uppercase" }}>{topic.domainName}</div>
-        )}
+        ) : view==="lesson"&&topic ? (
+          <div style={{fontSize:9,color:ac,letterSpacing:2.5,fontFamily:"'JetBrains Mono',monospace",textTransform:"uppercase"}}>{topic.domainName}</div>
+        ) : null}
       </header>
 
-      {view==="home" ? (
-        <div style={{ flex:1,overflowY:"auto" }}>
-          {/* Hero */}
-          <div style={{ maxWidth:800,margin:"0 auto",padding:"54px 40px 44px" }}>
-            <div style={{ fontSize:9,letterSpacing:5,color:"#2E2E2E",fontFamily:"'JetBrains Mono',monospace",marginBottom:20 }}>THE COMPLETE PATH</div>
-            <h1 style={{ fontSize:46,fontWeight:400,lineHeight:1.17,margin:"0 0 20px",color:"#E2D9CE" }}>
-              From probability axioms<br/><em style={{ color:"#D4A96A" }}>to production transformers.</em>
-            </h1>
-            <p style={{ color:"#505050",fontSize:15.5,lineHeight:1.9,margin:"0 0 34px",maxWidth:540 }}>
-              Not a course. A professor. Click any topic, demand the derivation, push for the code —
-              and wait for the moment when latent spaces, backprop and attention all click into one unified picture.
+      {/* ══ HOME ══ */}
+      {view==="home" && (
+        <div style={{flex:1,overflowY:"auto"}}>
+          <div style={{maxWidth:800,margin:"0 auto",padding:"54px 40px 44px"}}>
+            <div style={{fontSize:9,letterSpacing:5,color:"#2E2E2E",fontFamily:"'JetBrains Mono',monospace",marginBottom:20}}>THE COMPLETE PATH</div>
+            <h1 style={{fontSize:46,fontWeight:400,lineHeight:1.17,margin:"0 0 20px",color:"#E2D9CE"}}>From probability axioms<br/><em style={{color:"#D4A96A"}}>to production transformers.</em></h1>
+            <p style={{color:"#505050",fontSize:15.5,lineHeight:1.9,margin:"0 0 34px",maxWidth:540}}>
+              Choose a topic for a structured lesson with a clear map, guided sections, and adaptive exercises — or open a free session to explore any question.
             </p>
-            <button onClick={()=>{setTopic(null);setMsgs([]);setView("chat");}}
-              style={{ background:"#D4A96A",color:"#080808",border:"none",borderRadius:8,padding:"11px 28px",fontSize:11.5,fontWeight:700,letterSpacing:2,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer" }}>
-              OPEN FREE SESSION →
-            </button>
+            <button onClick={()=>{setFreeMsgs([]);setView("free");}} style={{background:"#D4A96A",color:"#080808",border:"none",borderRadius:8,padding:"11px 28px",fontSize:11.5,fontWeight:700,letterSpacing:2,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer"}}>OPEN FREE SESSION →</button>
           </div>
-
-          {/* Curriculum */}
-          <div style={{ maxWidth:800,margin:"0 auto",padding:"0 40px 80px" }}>
-            {CURRICULUM.map((domain, di) => (
-              <div key={domain.domain} style={{ marginBottom:2,animation:`si .28s ease ${di*.04}s both` }}>
-                <div className="dhdr"
-                  onClick={()=>setExpanded(expanded===domain.domain?null:domain.domain)}
-                  style={{ display:"flex",alignItems:"center",gap:14,padding:"19px 4px 17px",borderBottom:"1px solid #111",transition:"opacity .2s" }}>
-                  <span style={{ fontSize:22,color:domain.color,width:32,textAlign:"center",fontFamily:"monospace",flexShrink:0 }}>{domain.glyph}</span>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:10,letterSpacing:3.5,color:domain.color,fontFamily:"'JetBrains Mono',monospace" }}>{domain.domain}</div>
-                    <div style={{ fontSize:12,color:"#404040",marginTop:3,fontStyle:"italic" }}>{domain.desc}</div>
+          <div style={{maxWidth:800,margin:"0 auto",padding:"0 40px 80px"}}>
+            {CURRICULUM.map((domain,di)=>(
+              <div key={domain.domain} style={{marginBottom:2,animation:`si .28s ease ${di*.04}s both`}}>
+                <div className="dhdr" onClick={()=>setExpanded(expanded===domain.domain?null:domain.domain)}
+                  style={{display:"flex",alignItems:"center",gap:14,padding:"19px 4px 17px",borderBottom:"1px solid #111",transition:"opacity .2s"}}>
+                  <span style={{fontSize:22,color:domain.color,width:32,textAlign:"center",fontFamily:"monospace",flexShrink:0}}>{domain.glyph}</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:10,letterSpacing:3.5,color:domain.color,fontFamily:"'JetBrains Mono',monospace"}}>{domain.domain}</div>
+                    <div style={{fontSize:12,color:"#404040",marginTop:3,fontStyle:"italic"}}>{domain.desc}</div>
                   </div>
-                  <div style={{ fontSize:10,color:"#303030",fontFamily:"'JetBrains Mono',monospace",display:"flex",alignItems:"center",gap:10,flexShrink:0 }}>
-                    <span style={{ color:domain.topics.some(t=>progress[t.id])?domain.color:"#303030" }}>
-                      {domain.topics.filter(t=>progress[t.id]).length}/{domain.topics.length}
-                    </span>
-                    <span style={{ fontSize:16,transition:"transform .22s",display:"inline-block",transform:expanded===domain.domain?"rotate(90deg)":"none" }}>›</span>
+                  <div style={{fontSize:10,color:"#303030",fontFamily:"'JetBrains Mono',monospace",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
+                    <span style={{color:domain.topics.some(t=>progress[t.id])?domain.color:"#303030"}}>{domain.topics.filter(t=>progress[t.id]).length}/{domain.topics.length}</span>
+                    <span style={{fontSize:16,transition:"transform .22s",display:"inline-block",transform:expanded===domain.domain?"rotate(90deg)":"none"}}>›</span>
                   </div>
                 </div>
                 {expanded===domain.domain && (
-                  <div style={{ animation:"fi .22s ease" }}>
-                    {domain.topics.map((t, ti) => (
-                      <div key={t.id} className="trow"
-                        onClick={()=>startTopic(t,domain)}
-                        style={{ display:"flex",alignItems:"center",gap:14,padding:"14px 8px 14px 46px",borderBottom:"1px solid #0D0D0D",animation:`fi .18s ease ${ti*.03}s both` }}>
-                        <div style={{ width:6,height:6,borderRadius:"50%",flexShrink:0,
-                          background:progress[t.id]?domain.color:"transparent",
-                          border:`1px solid ${progress[t.id]?domain.color:"#282828"}` }}/>
-                        <div style={{ flex:1,minWidth:0 }}>
-                          <div style={{ fontSize:14.5,color:progress[t.id]?"#E2D9CE":"#9A9490",marginBottom:3 }}>{t.title}</div>
-                          <div style={{ fontSize:11.5,color:"#363432",fontStyle:"italic" }}>{t.sub}</div>
+                  <div style={{animation:"fi .22s ease"}}>
+                    {domain.topics.map((t,ti)=>(
+                      <div key={t.id} className="trow" onClick={()=>startLesson(t,domain)}
+                        style={{display:"flex",alignItems:"center",gap:14,padding:"14px 8px 14px 46px",borderBottom:"1px solid #0D0D0D",animation:`fi .18s ease ${ti*.03}s both`}}>
+                        <div style={{width:6,height:6,borderRadius:"50%",flexShrink:0,background:progress[t.id]?domain.color:"transparent",border:`1px solid ${progress[t.id]?domain.color:"#282828"}`}}/>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:14.5,color:progress[t.id]?"#E2D9CE":"#9A9490",marginBottom:3}}>{t.title}</div>
+                          <div style={{fontSize:11.5,color:"#363432",fontStyle:"italic"}}>{t.sub}</div>
                         </div>
-                        <span style={{ color:domain.color,fontSize:14,flexShrink:0,opacity:.6 }}>→</span>
+                        <span style={{color:domain.color,fontSize:14,flexShrink:0,opacity:.6}}>→</span>
                       </div>
                     ))}
                   </div>
@@ -529,93 +461,166 @@ export default function Prof() {
             ))}
           </div>
         </div>
+      )}
 
-      ) : (
-        <div style={{ flex:1,display:"flex",flexDirection:"column",overflow:"hidden" }}>
-          {/* Messages */}
-          <div style={{ flex:1,overflowY:"auto",padding:"36px 0 20px" }}>
-            <div style={{ maxWidth:800,margin:"0 auto",padding:"0 36px" }}>
-              {msgs.length===0 && !busy && (
-                <div style={{ textAlign:"center",padding:"80px 0",animation:"fi .4s ease" }}>
-                  <div style={{ fontSize:54,opacity:.1,marginBottom:18,fontFamily:"monospace",color:ac }}>{topic?.glyph||"∑"}</div>
-                  <div style={{ color:"#363432",fontStyle:"italic",fontSize:14 }}>
-                    {topic ? `Preparing: ${topic.title}` : "Session open. Ask anything."}
-                  </div>
+      {/* ══ FREE SESSION ══ */}
+      {view==="free" && (
+        <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+          <div style={{flex:1,overflowY:"auto",padding:"36px 0 20px"}}>
+            <div style={{maxWidth:800,margin:"0 auto",padding:"0 36px"}}>
+              {freeMsgs.length===0&&!busy&&(
+                <div style={{textAlign:"center",padding:"80px 0",animation:"fi .4s ease"}}>
+                  <div style={{fontSize:54,opacity:.1,marginBottom:18,fontFamily:"monospace",color:"#D4A96A"}}>∑</div>
+                  <div style={{color:"#363432",fontStyle:"italic",fontSize:14,maxWidth:400,margin:"0 auto"}}>Ask anything about AI/ML. The professor knows the full curriculum and will connect your questions to the bigger picture.</div>
                 </div>
               )}
-              {msgs.map((m, i) => (
-                <div key={i} style={{ marginBottom:38,animation:"fi .3s ease" }}>
-                  <div style={{ fontSize:9,letterSpacing:3.5,fontFamily:"'JetBrains Mono',monospace",marginBottom:10,textTransform:"uppercase",color:m.role==="user"?"#484440":ac }}>
-                    {m.role==="user"?"YOU":"PROFESSOR"}
-                  </div>
-                  {m.role==="assistant" ? (
-                    <div style={{ paddingLeft:18,borderLeft:"2px solid #181818" }}>
-                      <MsgRenderer content={m.content} ready={ready} accent={ac}/>
-                    </div>
-                  ) : (
-                    <div style={{ color:"#7A7470",fontSize:15,lineHeight:1.75 }}>{m.content}</div>
-                  )}
+              {freeMsgs.map((m,i)=>(
+                <div key={i} style={{marginBottom:38,animation:"fi .3s ease"}}>
+                  <div style={{fontSize:9,letterSpacing:3.5,fontFamily:"'JetBrains Mono',monospace",marginBottom:10,textTransform:"uppercase",color:m.role==="user"?"#484440":"#D4A96A"}}>{m.role==="user"?"YOU":"PROFESSOR"}</div>
+                  {m.role==="assistant"
+                    ?<div style={{paddingLeft:18,borderLeft:"2px solid #181818"}}><MsgRenderer content={m.content} ready={ready} accent="#D4A96A"/></div>
+                    :<div style={{color:"#7A7470",fontSize:15,lineHeight:1.75}}>{m.content}</div>}
                 </div>
               ))}
-              {busy && (
-                <div style={{ animation:"fi .25s ease" }}>
-                  <div style={{ fontSize:9,letterSpacing:3.5,fontFamily:"'JetBrains Mono',monospace",marginBottom:8,color:ac }}>PROFESSOR</div>
-                  <div style={{ paddingLeft:18,borderLeft:"2px solid #181818" }}>
-                    <Dots color={ac}/>
-                  </div>
+              {busy&&<div style={{animation:"fi .25s ease"}}><div style={{fontSize:9,letterSpacing:3.5,fontFamily:"'JetBrains Mono',monospace",marginBottom:8,color:"#D4A96A"}}>PROFESSOR</div><div style={{paddingLeft:18,borderLeft:"2px solid #181818"}}><Dots color="#D4A96A"/></div></div>}
+              <div ref={endRef}/>
+            </div>
+          </div>
+          <div style={{borderTop:"1px solid #111",padding:"18px 36px 22px",background:"#080808"}}>
+            <div style={{maxWidth:800,margin:"0 auto",display:"flex",gap:12,alignItems:"flex-end"}}>
+              <textarea ref={taRef} value={input} onChange={e=>setInput(e.target.value)}
+                onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendFree(input);}}}
+                onInput={e=>{e.target.style.height="auto";e.target.style.height=Math.min(e.target.scrollHeight,180)+"px";}}
+                placeholder="Ask anything about AI/ML..."
+                style={{flex:1,background:"#0E0E0E",border:"1px solid #1C1C1C",borderRadius:10,padding:"14px 18px",color:"#E2D9CE",fontSize:14.5,fontFamily:"Palatino Linotype,Palatino,serif",lineHeight:1.65,minHeight:52,transition:"border-color .2s"}}
+                onFocus={e=>e.target.style.borderColor="#2A2A2A"} onBlur={e=>e.target.style.borderColor="#1C1C1C"}/>
+              <button className="sndbtn" onClick={()=>sendFree(input)} disabled={busy||!input.trim()}
+                style={{background:(!busy&&input.trim())?"#D4A96A":"#141414",color:(!busy&&input.trim())?"#080808":"#282828",border:"none",borderRadius:10,width:52,height:52,fontSize:20,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .2s",cursor:busy||!input.trim()?"not-allowed":"pointer"}}>→</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ LESSON ══ */}
+      {view==="lesson" && (
+        <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+          <div style={{flex:1,overflowY:"auto",padding:"36px 0 20px"}}>
+            <div style={{maxWidth:800,margin:"0 auto",padding:"0 36px"}}>
+
+              {/* MAP PHASE */}
+              {lessonPhase==="map" && (
+                <div style={{animation:"fi .4s ease"}}>
+                  {busy ? (
+                    <div style={{textAlign:"center",padding:"80px 0"}}>
+                      <div style={{fontSize:54,opacity:.1,marginBottom:18,fontFamily:"monospace",color:ac}}>{topic?.glyph||"∑"}</div>
+                      <div style={{color:"#363432",fontStyle:"italic",fontSize:13,marginBottom:24}}>Building your lesson map...</div>
+                      <Dots color={ac}/>
+                    </div>
+                  ) : lessonMap && (
+                    <div>
+                      <div style={{fontSize:9,letterSpacing:4,color:ac,fontFamily:"'JetBrains Mono',monospace",marginBottom:8}}>LESSON MAP</div>
+                      <h2 style={{fontSize:28,fontWeight:400,color:"#E2D9CE",margin:"0 0 6px"}}>{topic.title}</h2>
+                      <p style={{color:"#505050",fontSize:13,fontStyle:"italic",margin:"0 0 32px"}}>{lessonMap.length} sections · click any section to jump in, or start from the beginning</p>
+                      {lessonMap.map((sec,i)=>(
+                        <div key={sec.id} className="trow" onClick={()=>teachSection(i,lessonMap)}
+                          style={{display:"flex",alignItems:"flex-start",gap:16,padding:"16px 12px",borderBottom:"1px solid #0D0D0D",cursor:"pointer",animation:`fi .15s ease ${i*.03}s both`}}>
+                          <div style={{fontSize:11,color:ac,fontFamily:"'JetBrains Mono',monospace",minWidth:24,marginTop:3,opacity:.5}}>{String(i+1).padStart(2,"0")}</div>
+                          <div style={{flex:1}}>
+                            <div style={{fontSize:15,color:"#C8C0B6",marginBottom:3}}>{sec.title}</div>
+                            <div style={{fontSize:12,color:"#363432",fontStyle:"italic"}}>{sec.summary}</div>
+                          </div>
+                          <span style={{color:ac,fontSize:13,opacity:.3,marginTop:3}}>→</span>
+                        </div>
+                      ))}
+                      <div style={{marginTop:28}}>
+                        <button className="nextbtn" onClick={()=>teachSection(0,lessonMap)}
+                          style={{background:ac,color:"#080808",border:"none",borderRadius:8,padding:"12px 28px",fontSize:11,fontWeight:700,letterSpacing:2,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",transition:"all .2s"}}>
+                          BEGIN LESSON →
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
+
+              {/* LEARNING PHASE */}
+              {lessonPhase==="learning" && lessonMap && (
+                <div style={{animation:"fi .3s ease"}}>
+                  {/* Progress bar */}
+                  <div style={{display:"flex",gap:3,marginBottom:24}}>
+                    {lessonMap.map((_,i)=>(
+                      <div key={i} style={{flex:1,height:2,borderRadius:1,
+                        background:i<=sectionIdx?ac:"#1A1A1A",
+                        opacity:i===sectionIdx?1:i<sectionIdx?.45:.2,
+                        transition:"all .3s"}}/>
+                    ))}
+                  </div>
+                  <div style={{fontSize:9,letterSpacing:3.5,color:ac,fontFamily:"'JetBrains Mono',monospace",marginBottom:5}}>SECTION {sectionIdx+1} / {lessonMap.length}</div>
+                  <div style={{fontSize:21,color:"#E2D9CE",marginBottom:6,fontWeight:400}}>{lessonMap[sectionIdx].title}</div>
+                  <div style={{fontSize:12,color:"#363432",fontStyle:"italic",marginBottom:28}}>{lessonMap[sectionIdx].summary}</div>
+
+                  {sectionMsgs.map((m,i)=>(
+                    <div key={i} style={{marginBottom:38,animation:"fi .3s ease"}}>
+                      <div style={{fontSize:9,letterSpacing:3.5,fontFamily:"'JetBrains Mono',monospace",marginBottom:10,textTransform:"uppercase",color:m.role==="user"?"#484440":ac}}>{m.role==="user"?"YOU":"PROFESSOR"}</div>
+                      {m.role==="assistant"
+                        ?<div style={{paddingLeft:18,borderLeft:"2px solid #181818"}}><MsgRenderer content={m.content} ready={ready} accent={ac}/></div>
+                        :<div style={{color:"#7A7470",fontSize:15,lineHeight:1.75}}>{m.content}</div>}
+                    </div>
+                  ))}
+                  {busy&&<div style={{animation:"fi .25s ease"}}><div style={{fontSize:9,letterSpacing:3.5,fontFamily:"'JetBrains Mono',monospace",marginBottom:8,color:ac}}>PROFESSOR</div><div style={{paddingLeft:18,borderLeft:"2px solid #181818"}}><Dots color={ac}/></div></div>}
+                </div>
+              )}
+
+              {/* EXERCISES PHASE */}
+              {lessonPhase==="exercises" && (
+                <div style={{animation:"fi .3s ease"}}>
+                  <div style={{fontSize:9,letterSpacing:4,color:ac,fontFamily:"'JetBrains Mono',monospace",marginBottom:8}}>EXERCISES</div>
+                  <div style={{fontSize:22,color:"#E2D9CE",marginBottom:28,fontWeight:400}}>{topic.title}</div>
+                  {busy
+                    ?<div style={{paddingLeft:18,borderLeft:"2px solid #181818"}}><Dots color={ac}/></div>
+                    :exerciseContent&&<div style={{paddingLeft:18,borderLeft:"2px solid #181818"}}><MsgRenderer content={exerciseContent} ready={ready} accent={ac}/></div>
+                  }
+                  {!busy&&exerciseContent&&(
+                    <div style={{marginTop:36,padding:"20px 24px",background:"#0C0C0C",border:`1px solid ${ac}22`,borderRadius:10}}>
+                      <div style={{fontSize:11,color:ac,fontFamily:"'JetBrains Mono',monospace",letterSpacing:2,marginBottom:6}}>✓ LESSON COMPLETE</div>
+                      <div style={{fontSize:13,color:"#505050",fontStyle:"italic",marginBottom:16}}>You've covered all {lessonMap.length} sections of {topic.title}.</div>
+                      <button onClick={goHome} style={{background:"none",border:`1px solid ${ac}44`,color:ac,borderRadius:6,padding:"8px 18px",fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",letterSpacing:1}}>← BACK TO CURRICULUM</button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div ref={endRef}/>
             </div>
           </div>
 
-          {/* Exercise button */}
-          {topic && msgs.length >= 2 && !busy && (
-            <div style={{ padding:"0 36px 8px",maxWidth:800,margin:"0 auto",width:"100%" }}>
-              <button onClick={getExercises}
-                style={{ background:"transparent",border:`1px solid ${ac}44`,color:ac,borderRadius:8,padding:"8px 18px",fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",letterSpacing:1,transition:"all .2s",display:"flex",alignItems:"center",gap:8 }}
-                onMouseOver={e=>{e.currentTarget.style.background=`${ac}18`}}
-                onMouseOut={e=>{e.currentTarget.style.background="transparent"}}>
-                <span style={{ fontSize:14 }}>⊞</span> GENERATE EXERCISES
-              </button>
-            </div>
-          )}
-
-          {/* Quick prompts */}
-          {msgs.length>0 && msgs.length<7 && !busy && (
-            <div style={{ padding:"0 36px 10px",maxWidth:800,margin:"0 auto",width:"100%" }}>
-              <div style={{ display:"flex",gap:7,flexWrap:"wrap" }}>
-                {QUICK.map(q => (
-                  <button key={q} className="qbtn" onClick={()=>send(q)}
-                    style={{ background:"transparent",border:"1px solid #1C1C1C",color:"#484440",borderRadius:20,padding:"6px 14px",fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",transition:"all .15s",letterSpacing:.3 }}>
-                    {q}
-                  </button>
-                ))}
+          {/* BOTTOM BAR — only in learning phase */}
+          {lessonPhase==="learning" && !busy && sectionMsgs.length>0 && (
+            <div style={{borderTop:"1px solid #111",padding:"14px 36px 18px",background:"#080808"}}>
+              <div style={{maxWidth:800,margin:"0 auto"}}>
+                <div style={{display:"flex",gap:10,alignItems:"flex-end",marginBottom:10}}>
+                  <textarea ref={taRef} value={input} onChange={e=>setInput(e.target.value)}
+                    onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendInLesson(input);}}}
+                    onInput={e=>{e.target.style.height="auto";e.target.style.height=Math.min(e.target.scrollHeight,120)+"px";}}
+                    placeholder="Ask a question about this section..."
+                    style={{flex:1,background:"#0E0E0E",border:"1px solid #1C1C1C",borderRadius:10,padding:"12px 16px",color:"#E2D9CE",fontSize:14,fontFamily:"Palatino Linotype,Palatino,serif",lineHeight:1.6,minHeight:46,transition:"border-color .2s"}}
+                    onFocus={e=>e.target.style.borderColor="#2A2A2A"} onBlur={e=>e.target.style.borderColor="#1C1C1C"}/>
+                  <button className="sndbtn" onClick={()=>sendInLesson(input)} disabled={busy||!input.trim()}
+                    style={{background:(!busy&&input.trim())?ac:"#141414",color:(!busy&&input.trim())?"#080808":"#282828",border:"none",borderRadius:10,width:46,height:46,fontSize:18,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .2s",cursor:busy||!input.trim()?"not-allowed":"pointer"}}>→</button>
+                </div>
+                <div style={{display:"flex",gap:8,justifyContent:"space-between",alignItems:"center"}}>
+                  <button className="navbtn" onClick={()=>{setLessonPhase("map");}} style={{background:"none",border:"none",color:"#333",fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",letterSpacing:1,padding:0}}>⊟ MAP</button>
+                  <div style={{display:"flex",gap:8}}>
+                    {sectionIdx>0&&<button className="navbtn" onClick={()=>teachSection(sectionIdx-1,lessonMap)} style={{background:"none",border:"1px solid #1C1C1C",color:"#484440",borderRadius:7,padding:"7px 14px",fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",letterSpacing:1,transition:"all .2s"}}>← PREV</button>}
+                    {!isLast
+                      ?<button className="nextbtn" onClick={()=>teachSection(sectionIdx+1,lessonMap)} style={{background:ac,color:"#080808",border:"none",borderRadius:7,padding:"7px 18px",fontSize:11,fontWeight:700,letterSpacing:1.5,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",transition:"all .2s"}}>NEXT →</button>
+                      :<button className="nextbtn" onClick={generateExercises} style={{background:ac,color:"#080808",border:"none",borderRadius:7,padding:"7px 18px",fontSize:11,fontWeight:700,letterSpacing:1.5,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",transition:"all .2s"}}>GET EXERCISES ⊞</button>
+                    }
+                  </div>
+                </div>
               </div>
             </div>
           )}
-
-          {/* Input */}
-          <div style={{ borderTop:"1px solid #111",padding:"18px 36px 22px",background:"#080808" }}>
-            <div style={{ maxWidth:800,margin:"0 auto",display:"flex",gap:12,alignItems:"flex-end" }}>
-              <textarea ref={taRef} value={input}
-                onChange={e=>setInput(e.target.value)}
-                onKeyDown={e=>{ if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send(input);} }}
-                onInput={e=>{ e.target.style.height="auto"; e.target.style.height=Math.min(e.target.scrollHeight,180)+"px"; }}
-                placeholder="Ask. Demand the derivation. Push for the math, the code, the geometry..."
-                style={{ flex:1,background:"#0E0E0E",border:"1px solid #1C1C1C",borderRadius:10,padding:"14px 18px",color:"#E2D9CE",fontSize:14.5,fontFamily:"Palatino Linotype,Palatino,serif",lineHeight:1.65,minHeight:52,transition:"border-color .2s" }}
-                onFocus={e=>e.target.style.borderColor="#2A2A2A"}
-                onBlur={e=>e.target.style.borderColor="#1C1C1C"}
-              />
-              <button className="sndbtn" onClick={()=>send(input)} disabled={busy||!input.trim()}
-                style={{ background:(!busy&&input.trim())?ac:"#141414",color:(!busy&&input.trim())?"#080808":"#282828",border:"none",borderRadius:10,width:52,height:52,fontSize:20,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .2s",cursor:busy||!input.trim()?"not-allowed":"pointer" }}>
-                →
-              </button>
-            </div>
-            <div style={{ maxWidth:800,margin:"7px auto 0",textAlign:"center",fontSize:9,color:"#1E1E1E",fontFamily:"'JetBrains Mono',monospace",letterSpacing:1 }}>
-              ENTER send · SHIFT+ENTER newline
-            </div>
-          </div>
         </div>
       )}
     </div>
