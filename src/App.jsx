@@ -337,36 +337,37 @@ export default function Prof() {
   }
 
   // TEACH A SECTION — checks cache first, fetches from API only if not cached
-  async function teachSection(idx, map, forceRefresh=false) {
+  // topicSnapshot passed explicitly to avoid stale closure on topic state
+  async function teachSection(idx, map, forceRefresh=false, topicSnapshot=null) {
+    const t = topicSnapshot || topic; // use snapshot if provided, else current state
     const sec = map[idx];
     setSectionIdx(idx); setSectionMsgs([]); setLessonPhase("learning");
 
     // Check cache
-    const cached = !forceRefresh && loadSectionCache(topic.id, idx);
+    const cached = !forceRefresh && loadSectionCache(t.id, idx);
     if (cached) {
       setSectionMsgs(cached.msgs);
-      // Still update progress in case user jumped to this section directly
-      setProgress(p=>({...p,[topic.id]:{
-        sectionsCompleted: Math.max((p[topic.id]?.sectionsCompleted||0), idx+1),
+      setProgress(p=>({...p,[t.id]:{
+        sectionsCompleted: Math.max((p[t.id]?.sectionsCompleted||0), idx+1),
         totalSections: map.length,
-        done: p[topic.id]?.done || false
+        done: p[t.id]?.done || false
       }}));
-      return; // No API call needed
+      return; // No API call needed — loaded from cache instantly
     }
 
     // Not cached — fetch from API
     setBusy(true);
     const sys = SECTION_PROMPT.replace("{INDEX}",idx+1).replace("{TOTAL}",map.length)
-      .replace("{TOPIC}",topic.title).replace("{SECTION_TITLE}",sec.title).replace("{SECTION_SUMMARY}",sec.summary);
+      .replace("{TOPIC}",t.title).replace("{SECTION_TITLE}",sec.title).replace("{SECTION_SUMMARY}",sec.summary);
     const reply = await api([{role:"user",content:`Teach: ${sec.title}`}],sys);
     const msgs = [{role:"assistant",content:reply}];
     setSectionMsgs(msgs);
-    saveSectionCache(topic.id, idx, msgs); // Save for future visits
+    saveSectionCache(t.id, idx, msgs); // Persist for future visits
     setBusy(false);
-    setProgress(p=>({...p,[topic.id]:{
-      sectionsCompleted: Math.max((p[topic.id]?.sectionsCompleted||0), idx+1),
+    setProgress(p=>({...p,[t.id]:{
+      sectionsCompleted: Math.max((p[t.id]?.sectionsCompleted||0), idx+1),
       totalSections: map.length,
-      done: p[topic.id]?.done || false
+      done: p[t.id]?.done || false
     }}));
   }
 
@@ -590,7 +591,7 @@ export default function Prof() {
                         )}
                       </p>
                       {lessonMap.map((sec,i)=>(
-                        <div key={sec.id} className="trow" onClick={()=>teachSection(i,lessonMap)}
+                        <div key={sec.id} className="trow" onClick={()=>teachSection(i,lessonMap,false,topic)}
                           style={{display:"flex",alignItems:"flex-start",gap:16,padding:"16px 12px",borderBottom:"1px solid #0D0D0D",cursor:"pointer",animation:`fi .15s ease ${i*.03}s both`,
                           background: i===sectionIdx&&progress[topic?.id]?.sectionsCompleted>0?"rgba(255,255,255,.02)":"transparent"}}>
                           <div style={{fontSize:11,fontFamily:"'JetBrains Mono',monospace",minWidth:24,marginTop:3,
@@ -607,7 +608,7 @@ export default function Prof() {
                       ))}
                       <div style={{marginTop:28,display:"flex",gap:12,alignItems:"center"}}>
                         {progress[topic?.id]?.sectionsCompleted>0 && !progress[topic?.id]?.done && (
-                          <button className="nextbtn" onClick={()=>teachSection(sectionIdx,lessonMap)}
+                          <button className="nextbtn" onClick={()=>teachSection(sectionIdx,lessonMap,false,topic)}
                             style={{background:ac,color:"#080808",border:"none",borderRadius:8,padding:"12px 28px",fontSize:11,fontWeight:700,letterSpacing:2,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",transition:"all .2s"}}>
                             RESUME SECTION {sectionIdx+1} →
                           </button>
@@ -615,7 +616,7 @@ export default function Prof() {
                         {(!progress[topic?.id]?.sectionsCompleted || progress[topic?.id]?.done) && (() => {
                           const isDone = progress[topic?.id]?.done;
                           return (
-                            <button className="nextbtn" onClick={()=>teachSection(0,lessonMap)}
+                            <button className="nextbtn" onClick={()=>teachSection(0,lessonMap,false,topic)}
                               style={{
                                 background: isDone ? "#1A1A1A" : ac,
                                 color: isDone ? ac : "#080808",
@@ -649,7 +650,7 @@ export default function Prof() {
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:5}}>
                     <div style={{fontSize:9,letterSpacing:3.5,color:ac,fontFamily:"'JetBrains Mono',monospace"}}>SECTION {sectionIdx+1} / {lessonMap.length}</div>
                     {loadSectionCache(topic.id, sectionIdx) && (
-                      <button onClick={()=>teachSection(sectionIdx,lessonMap,true)}
+                      <button onClick={()=>teachSection(sectionIdx,lessonMap,true,topic)}
                         title="Fetch a fresh explanation"
                         style={{background:"none",border:"none",color:"#2A2A2A",fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",letterSpacing:1,padding:0,transition:"color .2s"}}
                         onMouseOver={e=>e.target.style.color="#555"} onMouseOut={e=>e.target.style.color="#2A2A2A"}>
@@ -712,9 +713,9 @@ export default function Prof() {
                 <div style={{display:"flex",gap:8,justifyContent:"space-between",alignItems:"center"}}>
                   <button className="navbtn" onClick={()=>{setLessonPhase("map");}} style={{background:"none",border:"none",color:"#333",fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",letterSpacing:1,padding:0}}>⊟ MAP</button>
                   <div style={{display:"flex",gap:8}}>
-                    {sectionIdx>0&&<button className="navbtn" onClick={()=>teachSection(sectionIdx-1,lessonMap)} style={{background:"none",border:"1px solid #1C1C1C",color:"#484440",borderRadius:7,padding:"7px 14px",fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",letterSpacing:1,transition:"all .2s"}}>← PREV</button>}
+                    {sectionIdx>0&&<button className="navbtn" onClick={()=>teachSection(sectionIdx-1,lessonMap,false,topic)} style={{background:"none",border:"1px solid #1C1C1C",color:"#484440",borderRadius:7,padding:"7px 14px",fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",letterSpacing:1,transition:"all .2s"}}>← PREV</button>}
                     {!isLast
-                      ?<button className="nextbtn" onClick={()=>teachSection(sectionIdx+1,lessonMap)} style={{background:ac,color:"#080808",border:"none",borderRadius:7,padding:"7px 18px",fontSize:11,fontWeight:700,letterSpacing:1.5,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",transition:"all .2s"}}>NEXT →</button>
+                      ?<button className="nextbtn" onClick={()=>teachSection(sectionIdx+1,lessonMap,false,topic)} style={{background:ac,color:"#080808",border:"none",borderRadius:7,padding:"7px 18px",fontSize:11,fontWeight:700,letterSpacing:1.5,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",transition:"all .2s"}}>NEXT →</button>
                       :<button className="nextbtn" onClick={generateExercises} style={{background:ac,color:"#080808",border:"none",borderRadius:7,padding:"7px 18px",fontSize:11,fontWeight:700,letterSpacing:1.5,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",transition:"all .2s"}}>GET EXERCISES ⊞</button>
                     }
                   </div>
