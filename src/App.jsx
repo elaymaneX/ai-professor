@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import { CURRICULUM_MAPS } from "./curriculum-maps.js";
 
 const CURRICULUM = [
   {
@@ -275,6 +276,7 @@ export default function Prof() {
   const taRef  = useRef(null);
   const ready  = useKaTeX();
 
+  // progress[topicId] = { sectionsCompleted: N, totalSections: N, done: bool }
   const [progress, setProgress] = useState(() => {
     try { const s=localStorage.getItem("professor-progress"); return s?JSON.parse(s):{} } catch { return {}; }
   });
@@ -298,18 +300,20 @@ export default function Prof() {
     setBusy(false);
   }
 
-  // START LESSON — generate map
-  async function startLesson(t, domain) {
+  // START LESSON — load static map, resume from saved progress
+  function startLesson(t, domain) {
     const full={...t,domainColor:domain.color,domainName:domain.domain};
-    setTopic(full); setView("lesson"); setLessonPhase("map");
-    setLessonMap(null); setSectionIdx(0); setSectionMsgs([]); setExerciseContent(null); setBusy(true);
-    const sys=MAP_PROMPT.replace("{TITLE}",t.title).replace("{SUB}",t.sub);
-    const raw=await api([{role:"user",content:`Generate lesson map for: ${t.title}`}],sys);
-    try {
-      const clean=raw.replace(/```json|```/g,"").trim();
-      setLessonMap(JSON.parse(clean).sections);
-    } catch { setLessonMap([{id:1,title:t.title,summary:t.depth}]); }
-    setBusy(false);
+    const map = CURRICULUM_MAPS[t.id] || [{id:1,title:t.title,summary:t.depth}];
+    const saved = progress[t.id];
+    // Resume from last completed section, or start from 0
+    const resumeIdx = saved ? Math.min(saved.sectionsCompleted, map.length - 1) : 0;
+    setTopic(full);
+    setLessonMap(map);
+    setSectionIdx(resumeIdx);
+    setSectionMsgs([]);
+    setExerciseContent(null);
+    setLessonPhase("map");
+    setView("lesson");
   }
 
   // TEACH A SECTION
@@ -321,7 +325,11 @@ export default function Prof() {
     const reply=await api([{role:"user",content:`Teach: ${sec.title}`}],sys);
     setSectionMsgs([{role:"assistant",content:reply}]);
     setBusy(false);
-    setProgress(p=>({...p,[topic.id]:Math.max(p[topic.id]||0,idx+1)}));
+    setProgress(p=>({...p,[topic.id]:{
+      sectionsCompleted: Math.max((p[topic.id]?.sectionsCompleted||0), idx+1),
+      totalSections: map.length,
+      done: p[topic.id]?.done || false
+    }}));
   }
 
   // QUESTION INSIDE LESSON
@@ -345,14 +353,18 @@ export default function Prof() {
     const sys=EXERCISE_PROMPT.replace("{TOPIC}",topic.title);
     const reply=await api([{role:"user",content:`Generate exercises for: ${topic.title}`}],sys);
     setExerciseContent(reply); setBusy(false);
-    setProgress(p=>({...p,[topic.id]:999}));
+    setProgress(p=>({...p,[topic.id]:{
+      sectionsCompleted: lessonMap.length,
+      totalSections: lessonMap.length,
+      done: true
+    }}));
   }
 
   function resetProgress() { setProgress({}); localStorage.removeItem("professor-progress"); }
   function goHome() { setView("home");setTopic(null);setLessonMap(null);setSectionMsgs([]);setFreeMsgs([]);setLessonPhase("map");setExerciseContent(null); }
 
   const total=CURRICULUM.reduce((a,d)=>a+d.topics.length,0);
-  const done=Object.keys(progress).length;
+  const done=Object.keys(progress).filter(k=>progress[k]?.sectionsCompleted>0).length;
   const ac=topic?.domainColor||"#D4A96A";
   const isLast=lessonMap&&sectionIdx===lessonMap.length-1;
 
@@ -438,7 +450,9 @@ export default function Prof() {
                     <div style={{fontSize:12,color:"#404040",marginTop:3,fontStyle:"italic"}}>{domain.desc}</div>
                   </div>
                   <div style={{fontSize:10,color:"#303030",fontFamily:"'JetBrains Mono',monospace",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
-                    <span style={{color:domain.topics.some(t=>progress[t.id])?domain.color:"#303030"}}>{domain.topics.filter(t=>progress[t.id]).length}/{domain.topics.length}</span>
+                    <span style={{color:domain.topics.some(t=>progress[t.id]?.sectionsCompleted>0)?domain.color:"#303030"}}>
+                      {domain.topics.filter(t=>progress[t.id]?.done).length}/{domain.topics.length}
+                    </span>
                     <span style={{fontSize:16,transition:"transform .22s",display:"inline-block",transform:expanded===domain.domain?"rotate(90deg)":"none"}}>›</span>
                   </div>
                 </div>
@@ -447,12 +461,21 @@ export default function Prof() {
                     {domain.topics.map((t,ti)=>(
                       <div key={t.id} className="trow" onClick={()=>startLesson(t,domain)}
                         style={{display:"flex",alignItems:"center",gap:14,padding:"14px 8px 14px 46px",borderBottom:"1px solid #0D0D0D",animation:`fi .18s ease ${ti*.03}s both`}}>
-                        <div style={{width:6,height:6,borderRadius:"50%",flexShrink:0,background:progress[t.id]?domain.color:"transparent",border:`1px solid ${progress[t.id]?domain.color:"#282828"}`}}/>
+                        <div style={{width:6,height:6,borderRadius:"50%",flexShrink:0,
+                          background:progress[t.id]?.done?domain.color:progress[t.id]?.sectionsCompleted>0?"transparent":"transparent",
+                          border:`1px solid ${progress[t.id]?.sectionsCompleted>0?domain.color:"#282828"}`}}/>
                         <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:14.5,color:progress[t.id]?"#E2D9CE":"#9A9490",marginBottom:3}}>{t.title}</div>
+                          <div style={{fontSize:14.5,color:progress[t.id]?.sectionsCompleted>0?"#E2D9CE":"#9A9490",marginBottom:3}}>{t.title}</div>
                           <div style={{fontSize:11.5,color:"#363432",fontStyle:"italic"}}>{t.sub}</div>
                         </div>
-                        <span style={{color:domain.color,fontSize:14,flexShrink:0,opacity:.6}}>→</span>
+                        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3,flexShrink:0}}>
+                          {progress[t.id]?.sectionsCompleted>0 && (
+                            <span style={{fontSize:9,color:domain.color,fontFamily:"'JetBrains Mono',monospace",letterSpacing:1,opacity:.8}}>
+                              {progress[t.id].done?"✓ DONE":`${progress[t.id].sectionsCompleted}/${progress[t.id].totalSections||CURRICULUM_MAPS[t.id]?.length||"?"}`}
+                            </span>
+                          )}
+                          <span style={{color:domain.color,fontSize:13,opacity:.4}}>→</span>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -510,33 +533,61 @@ export default function Prof() {
               {/* MAP PHASE */}
               {lessonPhase==="map" && (
                 <div style={{animation:"fi .4s ease"}}>
-                  {busy ? (
-                    <div style={{textAlign:"center",padding:"80px 0"}}>
-                      <div style={{fontSize:54,opacity:.1,marginBottom:18,fontFamily:"monospace",color:ac}}>{topic?.glyph||"∑"}</div>
-                      <div style={{color:"#363432",fontStyle:"italic",fontSize:13,marginBottom:24}}>Building your lesson map...</div>
-                      <Dots color={ac}/>
-                    </div>
-                  ) : lessonMap && (
+                  {lessonMap && (
                     <div>
                       <div style={{fontSize:9,letterSpacing:4,color:ac,fontFamily:"'JetBrains Mono',monospace",marginBottom:8}}>LESSON MAP</div>
                       <h2 style={{fontSize:28,fontWeight:400,color:"#E2D9CE",margin:"0 0 6px"}}>{topic.title}</h2>
-                      <p style={{color:"#505050",fontSize:13,fontStyle:"italic",margin:"0 0 32px"}}>{lessonMap.length} sections · click any section to jump in, or start from the beginning</p>
+                      <p style={{color:"#505050",fontSize:13,fontStyle:"italic",margin:"0 0 32px"}}>
+                        {lessonMap.length} sections
+                        {progress[topic?.id]?.sectionsCompleted>0 && !progress[topic?.id]?.done && (
+                          <span style={{color:ac,marginLeft:12}}>· {progress[topic?.id].sectionsCompleted}/{lessonMap.length} completed — resuming from section {sectionIdx+1}</span>
+                        )}
+                        {progress[topic?.id]?.done && (
+                          <span style={{color:ac,marginLeft:12}}>· ✓ completed</span>
+                        )}
+                        {!progress[topic?.id]?.sectionsCompleted && (
+                          <span style={{marginLeft:8}}>· click any section to jump in</span>
+                        )}
+                      </p>
                       {lessonMap.map((sec,i)=>(
                         <div key={sec.id} className="trow" onClick={()=>teachSection(i,lessonMap)}
-                          style={{display:"flex",alignItems:"flex-start",gap:16,padding:"16px 12px",borderBottom:"1px solid #0D0D0D",cursor:"pointer",animation:`fi .15s ease ${i*.03}s both`}}>
-                          <div style={{fontSize:11,color:ac,fontFamily:"'JetBrains Mono',monospace",minWidth:24,marginTop:3,opacity:.5}}>{String(i+1).padStart(2,"0")}</div>
+                          style={{display:"flex",alignItems:"flex-start",gap:16,padding:"16px 12px",borderBottom:"1px solid #0D0D0D",cursor:"pointer",animation:`fi .15s ease ${i*.03}s both`,
+                          background: i===sectionIdx&&progress[topic?.id]?.sectionsCompleted>0?"rgba(255,255,255,.02)":"transparent"}}>
+                          <div style={{fontSize:11,fontFamily:"'JetBrains Mono',monospace",minWidth:24,marginTop:3,
+                            color: progress[topic?.id]?.sectionsCompleted>i ? ac : "#333",
+                            opacity: progress[topic?.id]?.sectionsCompleted>i ? 0.8 : 0.4}}>
+                            {progress[topic?.id]?.sectionsCompleted>i ? "✓" : String(i+1).padStart(2,"0")}
+                          </div>
                           <div style={{flex:1}}>
-                            <div style={{fontSize:15,color:"#C8C0B6",marginBottom:3}}>{sec.title}</div>
+                            <div style={{fontSize:15,color:progress[topic?.id]?.sectionsCompleted>i?"#E2D9CE":"#C8C0B6",marginBottom:3}}>{sec.title}</div>
                             <div style={{fontSize:12,color:"#363432",fontStyle:"italic"}}>{sec.summary}</div>
                           </div>
                           <span style={{color:ac,fontSize:13,opacity:.3,marginTop:3}}>→</span>
                         </div>
                       ))}
-                      <div style={{marginTop:28}}>
-                        <button className="nextbtn" onClick={()=>teachSection(0,lessonMap)}
-                          style={{background:ac,color:"#080808",border:"none",borderRadius:8,padding:"12px 28px",fontSize:11,fontWeight:700,letterSpacing:2,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",transition:"all .2s"}}>
-                          BEGIN LESSON →
-                        </button>
+                      <div style={{marginTop:28,display:"flex",gap:12,alignItems:"center"}}>
+                        {progress[topic?.id]?.sectionsCompleted>0 && !progress[topic?.id]?.done && (
+                          <button className="nextbtn" onClick={()=>teachSection(sectionIdx,lessonMap)}
+                            style={{background:ac,color:"#080808",border:"none",borderRadius:8,padding:"12px 28px",fontSize:11,fontWeight:700,letterSpacing:2,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",transition:"all .2s"}}>
+                            RESUME SECTION {sectionIdx+1} →
+                          </button>
+                        )}
+                        {(!progress[topic?.id]?.sectionsCompleted || progress[topic?.id]?.done) && (() => {
+                          const isDone = progress[topic?.id]?.done;
+                          return (
+                            <button className="nextbtn" onClick={()=>teachSection(0,lessonMap)}
+                              style={{
+                                background: isDone ? "#1A1A1A" : ac,
+                                color: isDone ? ac : "#080808",
+                                border: isDone ? "1px solid " + ac + "44" : "none",
+                                borderRadius:8, padding:"12px 28px", fontSize:11, fontWeight:700,
+                                letterSpacing:2, fontFamily:"'JetBrains Mono',monospace",
+                                cursor:"pointer", transition:"all .2s"
+                              }}>
+                              {isDone ? "REVIEW FROM START →" : "BEGIN LESSON →"}
+                            </button>
+                          );
+                        })()}
                       </div>
                     </div>
                   )}
