@@ -281,6 +281,26 @@ export default function Prof() {
     try { const s=localStorage.getItem("professor-progress"); return s?JSON.parse(s):{} } catch { return {}; }
   });
   useEffect(()=>{ localStorage.setItem("professor-progress",JSON.stringify(progress)); },[progress]);
+
+  // ── SECTION CACHE — stores professor responses per section ───────────────
+  // Key format: "topicId:sectionIdx", value: { msgs: [...], savedAt: timestamp }
+  const sectionCacheKey = (topicId, idx) => `sc:${topicId}:${idx}`;
+  function loadSectionCache(topicId, idx) {
+    try {
+      const raw = localStorage.getItem(sectionCacheKey(topicId, idx));
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  }
+  function saveSectionCache(topicId, idx, msgs) {
+    try {
+      localStorage.setItem(sectionCacheKey(topicId, idx), JSON.stringify({
+        msgs, savedAt: Date.now()
+      }));
+    } catch(e) { console.warn("Cache save failed", e); }
+  }
+  function clearSectionCache(topicId, idx) {
+    localStorage.removeItem(sectionCacheKey(topicId, idx));
+  }
   useEffect(()=>{ endRef.current?.scrollIntoView({behavior:"smooth"}); },[sectionMsgs,freeMsgs,busy,lessonMap,lessonPhase,exerciseContent]);
 
   async function api(messages, system) {
@@ -316,14 +336,32 @@ export default function Prof() {
     setView("lesson");
   }
 
-  // TEACH A SECTION
-  async function teachSection(idx, map) {
-    const sec=map[idx];
-    setSectionIdx(idx); setSectionMsgs([]); setLessonPhase("learning"); setBusy(true);
-    const sys=SECTION_PROMPT.replace("{INDEX}",idx+1).replace("{TOTAL}",map.length)
+  // TEACH A SECTION — checks cache first, fetches from API only if not cached
+  async function teachSection(idx, map, forceRefresh=false) {
+    const sec = map[idx];
+    setSectionIdx(idx); setSectionMsgs([]); setLessonPhase("learning");
+
+    // Check cache
+    const cached = !forceRefresh && loadSectionCache(topic.id, idx);
+    if (cached) {
+      setSectionMsgs(cached.msgs);
+      // Still update progress in case user jumped to this section directly
+      setProgress(p=>({...p,[topic.id]:{
+        sectionsCompleted: Math.max((p[topic.id]?.sectionsCompleted||0), idx+1),
+        totalSections: map.length,
+        done: p[topic.id]?.done || false
+      }}));
+      return; // No API call needed
+    }
+
+    // Not cached — fetch from API
+    setBusy(true);
+    const sys = SECTION_PROMPT.replace("{INDEX}",idx+1).replace("{TOTAL}",map.length)
       .replace("{TOPIC}",topic.title).replace("{SECTION_TITLE}",sec.title).replace("{SECTION_SUMMARY}",sec.summary);
-    const reply=await api([{role:"user",content:`Teach: ${sec.title}`}],sys);
-    setSectionMsgs([{role:"assistant",content:reply}]);
+    const reply = await api([{role:"user",content:`Teach: ${sec.title}`}],sys);
+    const msgs = [{role:"assistant",content:reply}];
+    setSectionMsgs(msgs);
+    saveSectionCache(topic.id, idx, msgs); // Save for future visits
     setBusy(false);
     setProgress(p=>({...p,[topic.id]:{
       sectionsCompleted: Math.max((p[topic.id]?.sectionsCompleted||0), idx+1),
@@ -343,7 +381,9 @@ export default function Prof() {
     setSectionMsgs(newMsgs); setInput(""); setBusy(true);
     if(taRef.current) taRef.current.style.height="46px";
     const reply=await api(newMsgs,sys);
-    setSectionMsgs([...newMsgs,{role:"assistant",content:reply}]);
+    const updatedMsgs = [...newMsgs,{role:"assistant",content:reply}];
+    setSectionMsgs(updatedMsgs);
+    saveSectionCache(topic.id, sectionIdx, updatedMsgs); // Update cache with Q&A
     setBusy(false);
   }
 
@@ -606,7 +646,17 @@ export default function Prof() {
                         transition:"all .3s"}}/>
                     ))}
                   </div>
-                  <div style={{fontSize:9,letterSpacing:3.5,color:ac,fontFamily:"'JetBrains Mono',monospace",marginBottom:5}}>SECTION {sectionIdx+1} / {lessonMap.length}</div>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:5}}>
+                    <div style={{fontSize:9,letterSpacing:3.5,color:ac,fontFamily:"'JetBrains Mono',monospace"}}>SECTION {sectionIdx+1} / {lessonMap.length}</div>
+                    {loadSectionCache(topic.id, sectionIdx) && (
+                      <button onClick={()=>teachSection(sectionIdx,lessonMap,true)}
+                        title="Fetch a fresh explanation"
+                        style={{background:"none",border:"none",color:"#2A2A2A",fontSize:11,fontFamily:"'JetBrains Mono',monospace",cursor:"pointer",letterSpacing:1,padding:0,transition:"color .2s"}}
+                        onMouseOver={e=>e.target.style.color="#555"} onMouseOut={e=>e.target.style.color="#2A2A2A"}>
+                        ↻ refresh
+                      </button>
+                    )}
+                  </div>
                   <div style={{fontSize:21,color:"#E2D9CE",marginBottom:6,fontWeight:400}}>{lessonMap[sectionIdx].title}</div>
                   <div style={{fontSize:12,color:"#363432",fontStyle:"italic",marginBottom:28}}>{lessonMap[sectionIdx].summary}</div>
 
